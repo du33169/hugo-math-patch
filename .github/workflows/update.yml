@@ -24,22 +24,14 @@ jobs:
       with: 
         repository: gohugoio/hugo
     # output: steps.hugo_release.outputs.release
-    - name: Cache hugo release versions
-      id: hugo_version_cache
-      uses: actions/cache@v3
+
+    - name: Checkout code
+      uses: actions/checkout@v2
       with:
-        path: hugo_version.txt
-        key: hugo-release-version
-    - name: init version
-      id: init_version
-      if: steps.hugo_version_cache.outputs.cache-hit != 'true'
-      run: |
-        echo ${{ steps.hugo_release.outputs.release }} > hugo_version.txt
-        echo "new_release=true" >> $GITHUB_OUTPUT
+        ref: release
 
     - name: update version
       id: update_version
-      if: steps.hugo_version_cache.outputs.cache-hit == 'true'
       run: |
         cached_version=$(cat hugo_version.txt)
         if [ "$cached_version" == "${{ steps.hugo_release.outputs.release }}" ]; then
@@ -48,22 +40,18 @@ jobs:
           echo "new_release=true" >> $GITHUB_OUTPUT
           echo ${{ steps.hugo_release.outputs.release }} > hugo_version.txt
           echo "Updated hugo_version.txt cache with new version ${{ steps.hugo_release.outputs.release }}."
+
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add hugo_version.txt
+          git commit -m "${{ steps.hugo_release.outputs.release }}"
+          git tag -a "${{ steps.hugo_release.outputs.release }}" -m "update hugo version to ${{ steps.hugo_release.outputs.release }}"
+          git push origin "${{ steps.hugo_release.outputs.release }}"
         fi
-    - name: generate new_release
-      id: generate_new_release
-      run: |
-        if [ -n ${{ steps.init_version.outputs.new_release }} ];then
-          echo "new_release=${{ steps.init_version.outputs.new_release }}" >> $GITHUB_OUTPUT
-        else
-          if [ -n ${{ steps.update_version.outputs.new_release }} ];then
-            echo "new_release=${{ steps.update_version.outputs.new_release }}" >> $GITHUB_OUTPUT
-          else
-            echo Error: new_release empty
-          fi
-        fi
+
     outputs:
       hugo_version: ${{ steps.hugo_release.outputs.release }}
-      new_release: ${{ steps.generate_new_release.outputs.new_release }}
+      new_release: ${{ steps.update_version.outputs.new_release }}
 
   build:
     needs: version-check
@@ -83,6 +71,7 @@ jobs:
     - name: Check out patch
       uses: actions/checkout@v2
       with:
+        ref: main
         path: patch
     - name: Set up Go
       uses: actions/setup-go@v2
@@ -140,10 +129,12 @@ jobs:
       if: (matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest' )
       uses: softprops/action-gh-release@v1
       with:
+        tag_name: ${{ needs.version-check.outputs.hugo_version }}
         files: "hugo_katex_${{ runner.os }}_${{ needs.version-check.outputs.hugo_version }}"
 
     - name: Create and upload release for Windows
       if: matrix.os == 'windows-latest'
       uses: softprops/action-gh-release@v1
       with:
+        tag_name: ${{ needs.version-check.outputs.hugo_version }}
         files: "hugo_katex_${{ runner.os }}_${{ needs.version-check.outputs.hugo_version }}.exe"
