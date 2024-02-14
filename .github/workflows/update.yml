@@ -26,7 +26,7 @@ jobs:
     # output: steps.hugo_release.outputs.release
 
     - name: Checkout code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
       with:
         ref: release
 
@@ -44,9 +44,10 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add hugo_version.txt
-          git commit -m "${{ steps.hugo_release.outputs.release }}"
-          git tag -a "${{ steps.hugo_release.outputs.release }}" -m "update hugo version to ${{ steps.hugo_release.outputs.release }}"
-          git push origin "${{ steps.hugo_release.outputs.release }}"
+          git status
+          git commit -m "sync with hugo version ${{ steps.hugo_release.outputs.release }}"
+          git tag -a "${{ steps.hugo_release.outputs.release }}" -m "sync with hugo version ${{ steps.hugo_release.outputs.release }}"
+          git push origin release --tags
         fi
 
     outputs:
@@ -64,12 +65,12 @@ jobs:
     steps:
 
     - name: Check out hugo src code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
       with:
         repository: gohugoio/hugo
         ref: ${{ needs.version-check.outputs.hugo_version }}
     - name: Check out patch
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
       with:
         ref: main
         path: patch
@@ -113,28 +114,29 @@ jobs:
     #   env:
     #     HUGO_BUILD_TAGS: extended
 
-    #rename
-    - name: rename release asset for Ubuntu/macos
+    #packup
+    - name: Create release asset for Ubuntu/macos
       if: matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest'
       run: |
-        mv hugo "hugo_katex_${{ runner.os }}_${{ needs.version-check.outputs.hugo_version }}"
+        tar -cvf - hugo | gzip -9 > "hugo_katex_${{ runner.os }}_${{ needs.version-check.outputs.hugo_version }}.tar.gz"
 
-    - name: rename release asset for Windows
+    - name: Create release asset for Windows
       if: matrix.os == 'windows-latest'
       run: |
-        ren hugo.exe "hugo_katex_${{ runner.os }}_${{ needs.version-check.outputs.hugo_version }}.exe"
-        
+        Compress-Archive -Path hugo.exe -DestinationPath "hugo_katex_${{ runner.os }}_${{ needs.version-check.outputs.hugo_version }}.zip" -CompressionLevel Optimal
+      shell: powershell
+
     # upload release
     - name: Create and upload release for Ubuntu/macos
       if: (matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest' )
       uses: softprops/action-gh-release@v1
       with:
         tag_name: ${{ needs.version-check.outputs.hugo_version }}
-        files: "hugo_katex_${{ runner.os }}_${{ needs.version-check.outputs.hugo_version }}"
+        files: "hugo_katex_${{ runner.os }}_${{ needs.version-check.outputs.hugo_version }}.tar.gz"
 
     - name: Create and upload release for Windows
       if: matrix.os == 'windows-latest'
       uses: softprops/action-gh-release@v1
       with:
         tag_name: ${{ needs.version-check.outputs.hugo_version }}
-        files: "hugo_katex_${{ runner.os }}_${{ needs.version-check.outputs.hugo_version }}.exe"
+        files: "hugo_katex_${{ runner.os }}_${{ needs.version-check.outputs.hugo_version }}.zip"
