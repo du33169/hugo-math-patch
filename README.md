@@ -1,3 +1,7 @@
+
+
+⚠️Deprecated: Hugo has officially supported math blocks([docs](https://gohugo.io/content-management/mathematics/)), this repo is no longer useful.
+
 # Hugo Math Patch
 
 Add support for math formula wrapped in `$..$` (inline) and `$$...$$`(multiline), which means you don't have to type `\\\\` in math for a real `\\` or add extra shortcode.
